@@ -1,57 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Tooly – Embed Editor</title>
+
+<style>
+/* quick dark-theme css */
+body{font-family:system-ui;background:#2b2d31;color:#f2f3f5;margin:0;padding:24px}
+input,textarea{width:100%;margin:6px 0;padding:8px;border:none;border-radius:6px;background:#1e1f22;color:#f2f3f5}
+button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:#fff;cursor:pointer}
+#status{margin-top:10px}
+</style>
+</head>
+
+<body>
+<h2>Edit Embed</h2>
+
+<label>Title <input id="title"></label>
+<label>Description <textarea id="desc" rows="4"></textarea></label>
+<label>Footer <input id="footer"></label>
+<hr>
+<label>Bot token <input id="token" placeholder="Bot XXXX"></label>
+<label>Channel ID <input id="channel"></label>
+<button id="send">Send Embed</button>
+<p id="status"></p>
+
+<!-- pako for zlib inflate -->
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <script>
-const qs  = new URLSearchParams(location.search);
-const raw = qs.get("data");
+/* wait until all elements exist */
+window.addEventListener("DOMContentLoaded", () => {
 
-if (!raw) {
-  status.textContent = "❌ No embed data in URL";
-  throw "no data";
-}
+  const qs   = new URLSearchParams(location.search);
+  const raw  = qs.get("data");
+  const stat = document.getElementById("status");
 
-let payload;
-try {
-  /* ---------------------------------------------------------
-     was:  pako.inflateRaw(buf)   ← wrong
-     now:  pako.inflate(buf)      ← works with zlib header
-  ---------------------------------------------------------- */
-  const packed  = atob(raw.replace(/-/g,'+').replace(/_/g,'/'));
-  const buf     = Uint8Array.from(packed, c => c.charCodeAt(0));
-  const jsonStr = new TextDecoder().decode(pako.inflate(buf));
-  payload       = JSON.parse(jsonStr);
-} catch (e) {
-  status.textContent = "❌ Corrupt data blob";
-  throw e;
-}
-
-/* ---------- small key clean-ups ---------- */
-const emb = payload.embed || {};
-title.value   = emb.title       || "";
-desc.value    = emb.description || "";
-footer.value  = emb.footer      || "";
-token.value   = payload.token   || "";      /* auto-filled now */
-channel.value = payload.channel || "";
-
-send.onclick = async () => {
-  if (!token.value || !channel.value) {
-     status.textContent = "Fill in token & channel";
-     return;
+  if (!raw) {
+    stat.textContent = "❌ No embed data in URL";
+    return;
   }
-  const newEmb = {
-    title:       title.value,
-    description: desc.value,
-    footer:      { text: footer.value },
-    /* colour key became colour → color in the blob, keep that */
-    color:       emb.color || 0
-  };
-  const res = await fetch("/.netlify/functions/send-embed", {
+
+  let payload;
+  try {
+    /* decode BASE64-URL → UInt8Array → inflate (zlib header) → string */
+    const packed = Uint8Array.from(
+      atob(raw.replace(/-/g, '+').replace(/_/g, '/')),
+      c => c.charCodeAt(0)
+    );
+    const jsonStr = new TextDecoder().decode(pako.inflate(packed));
+    payload = JSON.parse(jsonStr);
+  } catch (e) {
+    stat.textContent = "❌ Corrupt data blob";
+    console.error(e);
+    return;
+  }
+
+  /* ---------- pre-fill form ---------- */
+  const emb = payload.embed || {};
+  title.value   = emb.title        || "";
+  desc.value    = emb.description  || "";
+  footer.value  = emb.footer       || "";
+  token.value   = payload.token    || "";   /* auto-filled */
+  channel.value = payload.channel  || "";
+
+  /* ---------- submit ---------- */
+  document.getElementById("send").onclick = async () => {
+    if (!token.value || !channel.value) {
+      stat.textContent = "Fill in token & channel";
+      return;
+    }
+
+    const newEmb = {
+      title:       title.value,
+      description: desc.value,
+      footer:      { text: footer.value },
+      color:       emb.color || 0
+    };
+
+    const res = await fetch("/.netlify/functions/send-embed",{
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body:JSON.stringify({
-          token:   token.value.trim(),
-          channel: channel.value.trim(),
-          embed:   newEmb
+        token:   token.value.trim(),
+        channel: channel.value.trim(),
+        embed:   newEmb
       })
-  });
-  status.textContent = await res.text();
-};
+    });
+
+    stat.textContent = await res.text();
+  };
+});
 </script>
+</body>
+</html>
