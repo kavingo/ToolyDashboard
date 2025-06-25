@@ -19,6 +19,8 @@ button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:
 <label>Title <input id="title"></label>
 <label>Description <textarea id="desc" rows="4"></textarea></label>
 <label>Footer <input id="footer"></label>
+<label>Image URL <input id="img"></label>
+<label>Colour (decimal or 0xRRGGBB) <input id="col"></label>
 <hr>
 <label>Bot token <input id="token" placeholder="Bot XXXX"></label>
 <label>Channel ID <input id="channel"></label>
@@ -60,6 +62,8 @@ window.addEventListener("DOMContentLoaded", () => {
   title.value   = emb.title        || "";
   desc.value    = emb.description  || "";
   footer.value  = emb.footer       || "";
+  img.value     = emb.image_url    || "";
+  col.value     = emb.color        || 0;
   token.value   = payload.token    || "";   /* auto-filled */
   channel.value = payload.channel  || "";
 
@@ -76,7 +80,15 @@ window.addEventListener("DOMContentLoaded", () => {
       footer:      { text: footer.value },
       color:       emb.color || 0
     };
-
+    let colour = parseInt(col.value.trim().replace(/^0x/i,""), 16);
+    if (Number.isNaN(colour)) colour = 0;
+    const newEmb = {
+     title:       title.value,
+     description: desc.value,
+     footer:      { text: footer.value },
+     image:       img.value ? { url: img.value.trim() } : undefined,
+     color:       colour
+    };
     const res = await fetch("/.netlify/functions/send-embed",{
       method:"POST",
       headers:{ "Content-Type":"application/json" },
@@ -88,6 +100,9 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     stat.textContent = await res.text();
+    const text = await res.text();
+    status.textContent = text;
+    if (!res.ok) console.error("Send-embed error", res.status, text);
   };
 });
 </script>
