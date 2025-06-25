@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
+<meta charset="utf-8"/>
 <title>Tooly – Embed Editor</title>
-
 <style>
-/* quick dark-theme css */
 body{font-family:system-ui;background:#2b2d31;color:#f2f3f5;margin:0;padding:24px}
 input,textarea{width:100%;margin:6px 0;padding:8px;border:none;border-radius:6px;background:#1e1f22;color:#f2f3f5}
 button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:#fff;cursor:pointer}
@@ -19,90 +17,86 @@ button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:
 <label>Title <input id="title"></label>
 <label>Description <textarea id="desc" rows="4"></textarea></label>
 <label>Footer <input id="footer"></label>
-<label>Image URL <input id="img"></label>
-<label>Colour (decimal or 0xRRGGBB) <input id="col"></label>
+<label>Image URL <input id="image"></label>
+<label>Colour (decimal or 0xRRGGBB) <input id="colour"></label>
 <hr>
 <label>Bot token <input id="token" placeholder="Bot XXXX"></label>
 <label>Channel ID <input id="channel"></label>
 <button id="send">Send Embed</button>
 <p id="status"></p>
 
-<!-- pako for zlib inflate -->
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <script>
-/* wait until all elements exist */
 window.addEventListener("DOMContentLoaded", () => {
-
   const qs   = new URLSearchParams(location.search);
   const raw  = qs.get("data");
   const stat = document.getElementById("status");
 
-  if (!raw) {
+  if (!raw){
     stat.textContent = "❌ No embed data in URL";
     return;
   }
 
+  /* ------- unpack the zlib-compressed, base64-url blob ------- */
   let payload;
-  try {
-    /* decode BASE64-URL → UInt8Array → inflate (zlib header) → string */
+  try{
     const packed = Uint8Array.from(
-      atob(raw.replace(/-/g, '+').replace(/_/g, '/')),
-      c => c.charCodeAt(0)
+      atob(raw.replace(/-/g,'+').replace(/_/g,'/')),
+      c=>c.charCodeAt(0)
     );
-    const jsonStr = new TextDecoder().decode(pako.inflate(packed));
-    payload = JSON.parse(jsonStr);
-  } catch (e) {
+    const json = new TextDecoder().decode(pako.inflate(packed)); // zlib header
+    payload = JSON.parse(json);
+  }catch(e){
     stat.textContent = "❌ Corrupt data blob";
     console.error(e);
     return;
   }
 
-  /* ---------- pre-fill form ---------- */
+  /* ------- pre-fill form ------- */
   const emb = payload.embed || {};
   title.value   = emb.title        || "";
   desc.value    = emb.description  || "";
   footer.value  = emb.footer       || "";
-  img.value     = emb.image_url    || "";
-  col.value     = emb.color        || 0;
-  token.value   = payload.token    || "";   /* auto-filled */
+  image.value   = emb.image        || "";
+  colour.value  = emb.color?.toString(10) || "";
+  token.value   = payload.token    || "";
   channel.value = payload.channel  || "";
 
-  /* ---------- submit ---------- */
-  document.getElementById("send").onclick = async () => {
-    if (!token.value || !channel.value) {
-      stat.textContent = "Fill in token & channel";
+  /* ------- send button ------- */
+  send.onclick = async () =>{
+    if(!token.value.trim() || !channel.value.trim()){
+      stat.textContent="Fill token & channel ID first";
       return;
+    }
+
+    let colourInt = 0;
+    if(colour.value.trim()){
+      colourInt = colour.value.startsWith("0x")
+         ? parseInt(colour.value.slice(2),16)
+         : parseInt(colour.value,10);
+      if(Number.isNaN(colourInt)) colourInt = 0;
     }
 
     const newEmb = {
       title:       title.value,
       description: desc.value,
-      footer:      { text: footer.value },
-      color:       emb.color || 0
+      footer:      footer.value ? {text:footer.value}:undefined,
+      image:       image.value  ? {url:image.value.trim()}:undefined,
+      color:       colourInt
     };
-    let colour = parseInt(col.value.trim().replace(/^0x/i,""), 16);
-    if (Number.isNaN(colour)) colour = 0;
-    const newEmb = {
-     title:       title.value,
-     description: desc.value,
-     footer:      { text: footer.value },
-     image:       img.value ? { url: img.value.trim() } : undefined,
-     color:       colour
-    };
+
     const res = await fetch("/.netlify/functions/send-embed",{
       method:"POST",
-      headers:{ "Content-Type":"application/json" },
+      headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        token:   token.value.trim(),
-        channel: channel.value.trim(),
-        embed:   newEmb
+        token:  token.value.trim(),
+        channel:channel.value.trim(),
+        embed:  newEmb
       })
     });
-
-    stat.textContent = await res.text();
     const text = await res.text();
-    status.textContent = text;
-    if (!res.ok) console.error("Send-embed error", res.status, text);
+    stat.textContent = text;
+    if(!res.ok) console.error("send-embed error",res.status,text);
   };
 });
 </script>
