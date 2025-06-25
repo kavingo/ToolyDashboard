@@ -16,30 +16,57 @@ button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:
 <button id="send">Send Embed</button>
 <p id="status"></p>
 
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <script>
 const qs  = new URLSearchParams(location.search);
 const raw = qs.get("data");
-if(!raw){status.textContent="❌ No embed data in URL";throw"";}
-const payload = JSON.parse(atob(raw.replace(/-/g,'+').replace(/_/g,'/')));
-const emb = payload.embed || {};
-title.value  = emb.title       || "";
-desc.value   = emb.description || "";
-footer.value = (emb.footer||{}).text || "";
-token.value  = payload.token   || "";
-channel.value= payload.channel || "";
 
-send.onclick = async ()=>{
-  if(!token.value||!channel.value){status.textContent="Fill token & channel";return;}
-  const newEmb = {...emb,
-      title:title.value,
-      description:desc.value,
-      footer:{text:footer.value}};
-  const res = await fetch("/.netlify/functions/send-embed",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({token:token.value,channel:channel.value,embed:newEmb})
+if (!raw) {
+  status.textContent = "❌ No embed data in URL";
+  throw "no data";
+}
+
+let payload;
+try {
+  // base64 → Uint8Array → inflate → string → JSON
+  const packed  = atob(raw.replace(/-/g,'+').replace(/_/g,'/'));
+  const buf     = Uint8Array.from(packed, c => c.charCodeAt(0));
+  const jsonStr = new TextDecoder().decode(pako.inflateRaw(buf));
+  payload       = JSON.parse(jsonStr);
+} catch (e) {
+  status.textContent = "❌ Corrupt data blob";
+  throw e;
+}
+
+const emb = payload.embed || {};
+title.value        = emb.title        || "";
+desc.value         = emb.description  || "";
+footer.value       = emb.footer       || "";
+token.value        = payload.token    || "";   // ← auto-filled
+channel.value      = payload.channel  || "";
+
+send.onclick = async () => {
+  if (!token.value || !channel.value) {
+     status.textContent = "Fill in token & channel";
+     return;
+  }
+  const newEmb = {
+    title:       title.value,
+    description: desc.value,
+    footer:      { text: footer.value },
+    color:       emb.colour || 0
+  };
+  const res = await fetch("/.netlify/functions/send-embed", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+          token:   token.value.trim(),
+          channel: channel.value.trim(),
+          embed:   newEmb
+      })
   });
   status.textContent = await res.text();
 };
 </script>
+
 </body></html>
