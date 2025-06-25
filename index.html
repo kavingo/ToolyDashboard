@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head>
+<meta charset="utf-8"/><title>Tooly – Embed Editor</title>
+<style>
+body{font-family:system-ui;background:#2b2d31;color:#f2f3f5;padding:24px}
+input,textarea{width:100%;margin:6px 0;padding:8px;border:none;border-radius:6px;background:#1e1f22;color:#f2f3f5}
+button{background:#5865f2;border:none;padding:10px 20px;border-radius:6px;color:#fff;cursor:pointer}
+</style></head><body>
+
+<h2>Edit Embed</h2>
+<label>Title <input id="title"></label>
+<label>Description <textarea id="desc" rows="4"></textarea></label>
+<label>Footer <input id="footer"></label>
+<hr>
+<label>Bot token <input id="token" placeholder="Bot XXXX"></label>
+<label>Channel ID <input id="channel"></label>
+<button id="send">Send Embed</button>
+<p id="status"></p>
+
+<script>
+const qs  = new URLSearchParams(location.search);
+const raw = qs.get("data");
+if(!raw){status.textContent="❌ No embed data in URL";throw"";}
+const payload = JSON.parse(atob(raw.replace(/-/g,'+').replace(/_/g,'/')));
+const emb = payload.embed || {};
+title.value  = emb.title       || "";
+desc.value   = emb.description || "";
+footer.value = (emb.footer||{}).text || "";
+token.value  = payload.token   || "";
+channel.value= payload.channel || "";
+
+send.onclick = async ()=>{
+  if(!token.value||!channel.value){status.textContent="Fill token & channel";return;}
+  const newEmb = {...emb,
+      title:title.value,
+      description:desc.value,
+      footer:{text:footer.value}};
+  const res = await fetch("/.netlify/functions/send-embed",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({token:token.value,channel:channel.value,embed:newEmb})
+  });
+  status.textContent = await res.text();
+};
+</script>
+</body></html>
