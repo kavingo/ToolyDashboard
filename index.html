@@ -85,7 +85,7 @@ window.addEventListener("DOMContentLoaded", () => {
       color:       colourInt
     };
 
-    const res = await fetch("/.netlify/functions/send-embed",{
+    const res = await fetch("/.netlify/functions/send-embed.js",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
