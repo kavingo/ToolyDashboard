@@ -8,6 +8,9 @@
     input, button, textarea { padding: 8px; border-radius: 6px; border: none; margin: 6px; background: #2f3136; color: #fff; }
     section { margin-bottom: 32px; }
   </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -22,33 +25,47 @@
 </section>
 
 <script>
-const token = new URLSearchParams(location.search).get('t');
-const info  = document.getElementById("info");
-const sendMdm = document.getElementById("sendMdm");
-const mdm     = document.getElementById("mdm");
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLp66-4S-WvW2-Z1i7NDWLi90m5lkbuaY",
+    authDomain: "toolyselfdashboard.firebaseapp.com",
+    databaseURL: "https://toolyselfdashboard-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "toolyselfdashboard",
+    storageBucket: "toolyselfdashboard.firebasestorage.app",
+    messagingSenderId: "241982728927",
+    appId: "1:241982728927:web:8c0f42fe13f45c9073176a"
+  };
 
-if (!token) {
-  info.textContent = "❌ No token in URL";
-  throw new Error("Missing token");
-}
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-sendMdm.onclick = async () => {
-  const text = mdm.value.trim();
-  if (!text) return alert("Message is empty!");
+  const token = new URLSearchParams(location.search).get('t');
+  const info = document.getElementById("info");
+  const sendMdm = document.getElementById("sendMdm");
+  const mdm = document.getElementById("mdm");
 
-  const res = await fetch("/.netlify/functions/exec", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token,
-      command: "massdm",
-      args: { text }
-    })
-  });
+  if (!token) {
+    info.textContent = "❌ No token in URL";
+    throw new Error("Missing token");
+  }
 
-  const data = await res.text();
-  info.textContent = res.ok ? "✅ Queued successfully!" : `❌ ${data}`;
-};
+  sendMdm.onclick = async () => {
+    const text = mdm.value.trim();
+    if (!text) return alert("Message is empty!");
+
+    try {
+      await db.ref("/queue").push({
+        token: token,
+        command: "massdm",
+        args: { text: text },
+        timestamp: Date.now()
+      });
+      info.textContent = "✅ Sent to queue!";
+    } catch (err) {
+      info.textContent = "❌ Error: " + err.message;
+    }
+  };
 </script>
 
 </body>
