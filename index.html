@@ -5,12 +5,16 @@
   <title>Tooly Dashboard</title>
   <style>
     body { font-family: system-ui; background: #202225; color: #f1f1f1; padding: 40px; }
-    input, button, textarea { padding: 8px; border-radius: 6px; border: none; margin: 6px; background: #2f3136; color: #fff; }
+    input, button, textarea {
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      margin: 6px;
+      background: #2f3136;
+      color: #fff;
+    }
     section { margin-bottom: 32px; }
   </style>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -25,47 +29,38 @@
 </section>
 
 <script>
-  // Your Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyCLp66-4S-WvW2-Z1i7NDWLi90m5lkbuaY",
-    authDomain: "toolyselfdashboard.firebaseapp.com",
-    databaseURL: "https://toolyselfdashboard-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "toolyselfdashboard",
-    storageBucket: "toolyselfdashboard.firebasestorage.app",
-    messagingSenderId: "241982728927",
-    appId: "1:241982728927:web:8c0f42fe13f45c9073176a"
-  };
+const qs = new URLSearchParams(location.search);
+const token = qs.get('t'); // ?t=<ENCRYPTED TOKEN>
+const info = document.getElementById("info");
+const sendMdm = document.getElementById("sendMdm");
+const mdm = document.getElementById("mdm");
 
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+if (!token) {
+  info.textContent = "❌ No token in URL";
+  throw new Error("Missing token");
+}
 
-  const token = new URLSearchParams(location.search).get('t');
-  const info = document.getElementById("info");
-  const sendMdm = document.getElementById("sendMdm");
-  const mdm = document.getElementById("mdm");
+sendMdm.onclick = async () => {
+  const text = mdm.value.trim();
+  if (!text) return alert("Message is empty!");
 
-  if (!token) {
-    info.textContent = "❌ No token in URL";
-    throw new Error("Missing token");
-  }
-
-  sendMdm.onclick = async () => {
-    const text = mdm.value.trim();
-    if (!text) return alert("Message is empty!");
-
-    try {
-      await db.ref("/queue").push({
-        token: token,
+  try {
+    const res = await fetch("/.netlify/functions/queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token,
         command: "massdm",
-        args: { text: text },
-        timestamp: Date.now()
-      });
-      info.textContent = "✅ Sent to queue!";
-    } catch (err) {
-      info.textContent = "❌ Error: " + err.message;
-    }
-  };
+        args: { text }
+      })
+    });
+
+    const data = await res.text();
+    info.textContent = res.ok ? "✅ Queued successfully!" : `❌ ${data}`;
+  } catch (err) {
+    info.textContent = "❌ Error: " + err.message;
+  }
+};
 </script>
 
 </body>
