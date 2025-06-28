@@ -1,33 +1,55 @@
-<!DOCTYPE html><html><head>
-<meta charset="utf-8"><title>Tooly Dashboard</title>
-<style>
-body{font-family:system-ui;background:#202225;color:#f1f1f1;padding:40px}
-input,button{padding:8px;border-radius:6px;border:none;margin:6px}
-section{margin-bottom:32px}
-</style></head><body>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tooly Dashboard</title>
+  <style>
+    body { font-family: system-ui; background: #202225; color: #f1f1f1; padding: 40px; }
+    input, button, textarea { padding: 8px; border-radius: 6px; border: none; margin: 6px; background: #2f3136; color: #fff; }
+    section { margin-bottom: 32px; }
+  </style>
+</head>
+<body>
 
 <h1>Tooly Dashboard</h1>
 
 <section id="info">🔄 Loading…</section>
 
 <section>
-<h3>Mass DM</h3>
-<textarea id="mdm" rows="4" placeholder="Text to DM your friends"></textarea><br>
-<button onclick="execCmd('massdm', mdm.value)">Send</button>
+  <h3>Mass DM</h3>
+  <textarea id="mdm" rows="4" placeholder="Text to DM your friends"></textarea><br>
+  <button id="sendMdm">Send</button>
 </section>
 
 <script>
 const token = new URLSearchParams(location.search).get('t');
-if(!token){info.textContent='❌ no token';throw 'no tok';}
+const info  = document.getElementById("info");
+const sendMdm = document.getElementById("sendMdm");
+const mdm     = document.getElementById("mdm");
 
-async function execCmd(cmd, args){
-  const res = await fetch('/.netlify/functions/exec', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({token, command:cmd, args})
-  });
-  const j = await res.json();
-  info.textContent = j.status === 'ok' ? '✅ Done' : '❌ '+j.status;
+if (!token) {
+  info.textContent = "❌ No token in URL";
+  throw new Error("Missing token");
 }
+
+sendMdm.onclick = async () => {
+  const text = mdm.value.trim();
+  if (!text) return alert("Message is empty!");
+
+  const res = await fetch("/.netlify/functions/queue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      command: "massdm",
+      args: { text }
+    })
+  });
+
+  const data = await res.text();
+  info.textContent = res.ok ? "✅ Queued successfully!" : `❌ ${data}`;
+};
 </script>
-</body></html>
+
+</body>
+</html>
