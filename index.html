@@ -36,7 +36,7 @@ sendMdm.onclick = async () => {
   const text = mdm.value.trim();
   if (!text) return alert("Message is empty!");
 
-  const res = await fetch("/.netlify/functions/queue", {
+  const res = await fetch("/.netlify/functions/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
