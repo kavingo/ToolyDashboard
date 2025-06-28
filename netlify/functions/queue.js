@@ -1,32 +1,15 @@
-const fs = require('fs');
-const path = require('path');
+import fs from "fs/promises";
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+export async function handler(event) {
+  const { command, args } = JSON.parse(event.body || "{}");
 
-  try {
-    const body = JSON.parse(event.body);
-    const queueFile = path.join(__dirname, '../../queue.json');
+  // quick validation
+  if (!command) return { statusCode: 400, body: "no command" };
 
-    // Load current queue
-    let queue = [];
-    if (fs.existsSync(queueFile)) {
-      queue = JSON.parse(fs.readFileSync(queueFile));
-    }
-
-    // Append new command
-    queue.push({
-      token: body.token,
-      command: body.command,
-      args: body.args || {},
-      timestamp: Date.now()
-    });
-
-    fs.writeFileSync(queueFile, JSON.stringify(queue, null, 2));
-    return { statusCode: 200, body: 'Queued' };
-  } catch (err) {
-    return { statusCode: 500, body: 'Error: ' + err.message };
-  }
-};
+  const file = "queue.json";
+  let q = [];
+  try { q = JSON.parse(await fs.readFile(file)); } catch {}
+  q.push({ command, args, timestamp: Date.now() });
+  await fs.writeFile(file, JSON.stringify(q, null, 2));
+  return { statusCode: 200, body: "queued" };
+}
