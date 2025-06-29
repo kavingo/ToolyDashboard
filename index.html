@@ -22,8 +22,11 @@
 </section>
 
 <script>
+
+
 // ✅ Step 1: Change to look for ?c= (not ?t=)
 const code = new URLSearchParams(location.search).get('c');
+const port = new URLSearchParams(location.search).get('p') || 9000;  // fallback
 const info = document.getElementById("info");
 const sendMdm = document.getElementById("sendMdm");
 const mdm = document.getElementById("mdm");
@@ -39,15 +42,15 @@ sendMdm.onclick = async () => {
   const text = mdm.value.trim();
   if (!text) return alert("Message is empty!");
 
-  const res = await fetch("/.netlify/functions/queue", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      code,                                // ← renamed from token
-      command: "massdm",
-      args: { text }
-    })
-  });
+  const res = await fetch(`http://127.0.0.1:${port}/dash/queue`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    code,
+    command: "massdm",
+    args: { text }
+  })
+});
 
   const data = await res.text();
   info.textContent = res.ok ? "✅ Queued successfully!" : `❌ ${data}`;
