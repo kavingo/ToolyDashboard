@@ -1,61 +1,190 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Tooly Dashboard</title>
-  <style>
-    body { font-family: system-ui; background: #202225; color: #f1f1f1; padding: 40px; }
-    input, button, textarea { padding: 8px; border-radius: 6px; border: none; margin: 6px; background: #2f3136; color: #fff; }
-    section { margin-bottom: 32px; }
-  </style>
-</head>
-<body>
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { Send, TerminalSquare, Settings } from "lucide-react";
 
-<h1>Tooly Dashboard</h1>
+const apiRoot = `${window.location.protocol}//${window.location.host}`; // same origin (127.0.0.1:{port})
+const query = new URLSearchParams(window.location.search);
+const code = query.get("c");
+const port = query.get("p") || 9000;
+const queueUrl = `http://127.0.0.1:${port}/dash/queue`;
 
-<section id="info">🔄 Loading…</section>
-
-<section>
-  <h3>Mass DM</h3>
-  <textarea id="mdm" rows="4" placeholder="Text to DM your friends"></textarea><br>
-  <button id="sendMdm">Send</button>
-</section>
-
-<script>
-
-
-// ✅ Step 1: Change to look for ?c= (not ?t=)
-const code = new URLSearchParams(location.search).get('c');
-const port = new URLSearchParams(location.search).get('p') || 9000;  // fallback
-const info = document.getElementById("info");
-const sendMdm = document.getElementById("sendMdm");
-const mdm = document.getElementById("mdm");
-
-// ✅ Error message if no token
-if (!code) {
-  info.textContent = "❌ No token in URL";
-  throw new Error("Missing token");
+export default function App() {
+  return (
+    <Router>
+      <div className="min-h-screen bg-[#202225] text-gray-100 flex flex-col">
+        <nav className="px-6 py-4 flex items-center justify-between shadow-xl backdrop-blur-lg/30 sticky top-0 z-50">
+          <h1 className="text-3xl font-bold tracking-wide">Tooly Dashboard</h1>
+          <div className="space-x-4 text-lg">
+            <NavLink to="/">Home</NavLink>
+            <NavLink to="/commands">Commands</NavLink>
+          </div>
+        </nav>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/commands" element={<Commands />} />
+        </Routes>
+      </div>
+    </Router>
+  );
 }
 
-// ✅ Send request on button click
-sendMdm.onclick = async () => {
-  const text = mdm.value.trim();
-  if (!text) return alert("Message is empty!");
+function NavLink({ to, children }) {
+  return (
+    <Link
+      to={to}
+      className="hover:text-emerald-400 transition-colors duration-200"
+    >
+      {children}
+    </Link>
+  );
+}
 
-  const res = await fetch(`http://127.0.0.1:${port}/dash/queue`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    code,
-    command: "massdm",
-    args: { text }
-  })
-});
+function Home() {
+  return (
+    <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <h2 className="text-4xl md:text-6xl font-extrabold bg-gradient-to-r from-emerald-400 to-violet-600 bg-clip-text text-transparent">
+          Welcome to Tooly ✨
+        </h2>
+        <p className="mt-4 text-lg text-gray-300 max-w-xl mx-auto">
+          Control your Discord self‑bot from anywhere. Use the <span className="font-semibold">Commands</span>{" "}
+          page to run actions like mass DM, custom status, reactions and more — all
+          without touching a console.
+        </p>
+      </motion.div>
+    </main>
+  );
+}
 
-  const data = await res.text();
-  info.textContent = res.ok ? "✅ Queued successfully!" : `❌ ${data}`;
-};
-</script>
+function Commands() {
+  const [massdmText, setMassdmText] = useState("");
+  const [statusText, setStatusText] = useState("");
+  const [afkText, setAfkText] = useState("");
+  const [toast, setToast] = useState("");
 
-</body>
-</html>
+  const send = async (command, args) => {
+    try {
+      const res = await fetch(queueUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, command, args }),
+      });
+      const data = await res.json();
+      setToast(data.status === "ok" ? "✅ Sent!" : `❌ ${data.detail || data.status}`);
+      setTimeout(() => setToast(""), 3000);
+    } catch (err) {
+      setToast("Network error");
+    }
+  };
+
+  return (
+    <div className="flex-1 p-6 grid gap-8 md:grid-cols-2 max-w-5xl mx-auto w-full">
+      {/* Mass DM card */}
+      <Card title="Mass DM" icon={Send}>
+        <textarea
+          value={massdmText}
+          onChange={(e) => setMassdmText(e.target.value)}
+          rows={4}
+          placeholder="Message to DM all friends"
+          className="w-full p-3 rounded-lg bg-[#2f3136] focus:outline-none"
+        />
+        <ActionButton onClick={() => send("massdm", { text: massdmText })}>
+          Blast it 💥
+        </ActionButton>
+      </Card>
+
+      {/* Status card */}
+      <Card title="Set Status" icon={TerminalSquare}>
+        <input
+          value={statusText}
+          onChange={(e) => setStatusText(e.target.value)}
+          placeholder="e.g. Working 🛠️"
+          className="w-full p-3 rounded-lg bg-[#2f3136] focus:outline-none"
+        />
+        <div className="flex gap-3 mt-3 flex-wrap">
+          {[
+            { label: "Online", val: "Online" },
+            { label: "AFK", val: "AFK" },
+            { label: "Working", val: "Working 🛠️" },
+          ].map((p) => (
+            <Preset key={p.label} onClick={() => setStatusText(p.val)}>
+              {p.label}
+            </Preset>
+          ))}
+        </div>
+        <ActionButton onClick={() => send("status", { text: statusText })}>
+          Update ✅
+        </ActionButton>
+      </Card>
+
+      {/* AFK card */}
+      <Card title="Set AFK" icon={Settings}>
+        <input
+          value={afkText}
+          onChange={(e) => setAfkText(e.target.value)}
+          placeholder="AFK message or emoji"
+          className="w-full p-3 rounded-lg bg-[#2f3136] focus:outline-none"
+        />
+        <ActionButton onClick={() => send("afk", { text: afkText })}>
+          Go AFK 💤
+        </ActionButton>
+      </Card>
+
+      {toast && (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 30 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#2f3136] px-6 py-3 rounded-xl shadow-lg"
+        >
+          {toast}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+function Card({ title, icon: Icon, children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className="rounded-2xl bg-[#292b2f] p-6 shadow-lg flex flex-col"
+    >
+      <div className="flex items-center gap-2 mb-4 text-xl font-semibold">
+        <Icon size={20} /> {title}
+      </div>
+      {children}
+    </motion.div>
+  );
+}
+
+function ActionButton({ children, onClick }) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      className="mt-4 w-full bg-gradient-to-r from-emerald-500 to-violet-600 py-2 rounded-xl font-semibold"
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+function Preset({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1 rounded-lg bg-[#3c3f45] hover:bg-[#4e525a] transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
