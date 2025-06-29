@@ -22,16 +22,19 @@
 </section>
 
 <script>
-const token = new URLSearchParams(location.search).get('t');
+// ✅ Step 1: Change to look for ?c= (not ?t=)
+const code = new URLSearchParams(location.search).get('c');
 const info = document.getElementById("info");
 const sendMdm = document.getElementById("sendMdm");
 const mdm = document.getElementById("mdm");
 
-if (!token) {
+// ✅ Error message if no token
+if (!code) {
   info.textContent = "❌ No token in URL";
   throw new Error("Missing token");
 }
 
+// ✅ Send request on button click
 sendMdm.onclick = async () => {
   const text = mdm.value.trim();
   if (!text) return alert("Message is empty!");
@@ -40,7 +43,7 @@ sendMdm.onclick = async () => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      token,
+      code,                                // ← renamed from token
       command: "massdm",
       args: { text }
     })
